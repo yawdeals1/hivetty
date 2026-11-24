@@ -4,7 +4,10 @@ PackageVersion: {{version}}
 PackageLocale: en-US
 Publisher: Hivetty
 PackageName: Hivetty
-License: Proprietary
+License: MIT
+LicenseUrl: https://github.com/yawdeals1/hivetty/blob/main/LICENSE
+PublisherUrl: https://github.com/yawdeals1
+PackageUrl: https://github.com/yawdeals1/hivetty
 ShortDescription: A terminal for running many AI coding agents side by side.
 Description: |-
   Hivetty is a Windows terminal built for running many AI coding agents at once: a workspace

@@ -42,7 +42,7 @@
       "../shell-integration/*": "shell-integration/"
     },
     "publisher": "Hivetty",
-    "copyright": "Copyright © 2026 Hivetty",
+    "copyright": "Copyright © 2026 yawdeals1. MIT License.",
     "category": "DeveloperTool",
     "shortDescription": "A terminal for running many AI coding agents side by side",
     "longDescription": "Hivetty is a Windows terminal built for running many AI coding agents at once: workspaces, split panes, agent notifications, an embedded scriptable browser and a CLI/pipe API.",
@@ -65,7 +65,10 @@
           "HivettyPathEnv"
         ]
       }
-    }
+    },
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "homepage": "https://github.com/yawdeals1/hivetty"
   },
   "plugins": {
     "updater": {
