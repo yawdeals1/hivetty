@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: Hivetty.Hivetty
+PackageVersion: {{version}}
+PackageLocale: en-US
+Publisher: Hivetty
+PackageName: Hivetty
+License: Proprietary
+ShortDescription: A terminal for running many AI coding agents side by side.
+Description: |-
+  Hivetty is a Windows terminal built for running many AI coding agents at once: a workspace
+  sidebar, split panes, "needs attention" notification rings, an embedded scriptable browser,
+  ssh and WSL workspaces, and a CLI and named-pipe API that agents can drive.
+Moniker: hivetty
+Tags:
+  - terminal
+  - console
+  - ai
+  - agents
+  - claude-code
+  - developer-tools
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

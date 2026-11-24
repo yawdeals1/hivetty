@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hivetty additions to the Tauri MSI (per-machine install): put [INSTALLDIR]bin, which holds
+     only hivetty.exe, on the machine PATH; Windows Installer removes it again on uninstall. -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="HivettyPathEnv" Guid="6E0B7C2A-7F43-4C52-9C38-2B0C61D1A9E4">
+        <RegistryValue Root="HKLM" Key="Software\Hivetty" Name="CliOnPath" Type="integer" Value="1" KeyPath="yes" />
+        <Environment Id="HivettyPathEntry" Name="PATH" Value="[INSTALLDIR]bin" Permanent="no" Part="last" Action="set" System="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

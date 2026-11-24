@@ -1,0 +1,17 @@
+[package]
+name = "hivetty-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+uuid.workspace = true
+thiserror.workspace = true
+vte.workspace = true
+toml_edit = "0.23"
+schemars = "1"
+serde_ignored = "0.1.14"
+regex = "1.13.2"
+aes-gcm = "0.11.1"

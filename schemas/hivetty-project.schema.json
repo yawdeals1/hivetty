@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProjectFile",
+  "description": "A per-project `hivetty.json` (or `.hivetty.json`) checked into a repository.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CustomCommand"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "CustomCommand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name shown in the command palette.",
+          "type": "string"
+        },
+        "command": {
+          "description": "Shell command line to run.",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/CommandTarget",
+          "default": "split-right"
+        },
+        "cwd": {
+          "description": "Working directory; relative paths resolve against the project file's folder.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "description": "Shell profile id to run it in (new panes only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keybinding": {
+          "description": "Key chord that runs this command (user config only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ]
+    },
+    "CommandTarget": {
+      "description": "Where a custom command runs.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "split-right",
+            "split-down",
+            "tab",
+            "workspace"
+          ]
+        },
+        {
+          "description": "Type it into the focused terminal.",
+          "type": "string",
+          "const": "current"
+        }
+      ]
+    }
+  }
+}

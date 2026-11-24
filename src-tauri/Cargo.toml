@@ -1,0 +1,44 @@
+[package]
+name = "hivetty-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "hivetty_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+hivetty-core = { path = "../crates/hivetty-core" }
+tauri = { version = "2", features = ["image-png", "unstable"] }
+tauri-plugin-notification = "2"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+portable-pty = "0.9"
+vt100 = "0.16"
+parking_lot = "0.12"
+anyhow = "1"
+which = "8"
+log = "0.4"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_Security_Cryptography", "Win32_System_Diagnostics_ToolHelp", "Win32_System_SystemInformation", "Win32_System_Threading"] }
+tauri-plugin-opener = "2.7.3"
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation"] }
+base64 = "0.23.1"
+ignore = "0.4.35"
+grep-searcher = "0.1.18"
+grep-regex = "0.1.15"
+grep-matcher = "0.1.10"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+tauri-plugin-updater = "2"
+tauri-plugin-window-state = "2"
+winreg = "0.56"
+
+[features]
+# Serve the bundled frontend (ui/dist) instead of the Vite dev server.
+custom-protocol = ["tauri/custom-protocol"]

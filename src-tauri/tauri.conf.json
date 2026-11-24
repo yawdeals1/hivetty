@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Hivetty",
+  "version": "0.1.0",
+  "identifier": "com.hivetty.app",
+  "build": {
+    "beforeDevCommand": "pnpm --filter hivetty-ui dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm --filter hivetty-ui build",
+    "frontendDist": "../ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Hivetty",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 640,
+        "minHeight": 400,
+        "backgroundColor": "#111317",
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../shell-integration/*": "shell-integration/"
+    },
+    "publisher": "Hivetty",
+    "copyright": "Copyright © 2026 Hivetty",
+    "category": "DeveloperTool",
+    "shortDescription": "A terminal for running many AI coding agents side by side",
+    "longDescription": "Hivetty is a Windows terminal built for running many AI coding agents at once: workspaces, split panes, agent notifications, an embedded scriptable browser and a CLI/pipe API.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "windows/installer-hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "fragmentPaths": [
+          "windows/path-fragment.wxs"
+        ],
+        "componentRefs": [
+          "HivettyPathEnv"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDczQTc5QzgyN0MyMDQ1OUQKUldTZFJTQjhncHluYysxSzFERjltdHJjNjdEYlFtMjEyMnAxS0x5UGJpWno4QW5ERk5oTEJzczEK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

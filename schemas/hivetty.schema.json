@@ -1,0 +1,532 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Config",
+  "description": "Hivetty settings. Every key is optional; missing keys use their defaults.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "JSON schema reference for editor completion.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "font": {
+      "$ref": "#/$defs/FontConfig",
+      "default": {
+        "family": "\"Cascadia Code\", \"Cascadia Mono\", Consolas, \"Courier New\", monospace",
+        "size": 14.0,
+        "line_height": 1.1
+      }
+    },
+    "cursor": {
+      "$ref": "#/$defs/CursorConfig",
+      "default": {
+        "style": "bar",
+        "blink": true
+      }
+    },
+    "theme": {
+      "description": "Active color theme: a built-in name or one from `themes`.",
+      "type": "string",
+      "default": "Hivetty Dark"
+    },
+    "themes": {
+      "description": "Extra color themes (import Windows Terminal schemes from Settings → Appearance).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Theme"
+      },
+      "default": []
+    },
+    "terminal": {
+      "$ref": "#/$defs/TerminalConfig",
+      "default": {
+        "scrollback": 20000,
+        "copy_on_select": false,
+        "confirm_multiline_paste": true,
+        "bell": "attention",
+        "tmux_shim": true,
+        "wsl_shell_integration": true,
+        "screen_reader": false
+      }
+    },
+    "default_profile": {
+      "description": "Profile id for new terminals (e.g. \"pwsh\", \"cmd\", \"gitbash\", \"wsl:Ubuntu\", or a custom id).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "profiles": {
+      "description": "Custom shell profiles. A profile with the id of a detected one replaces it.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CustomProfile"
+      },
+      "default": []
+    },
+    "hidden_profiles": {
+      "description": "Detected profile ids to hide from menus.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "keybindings": {
+      "description": "Key chord → action id. Use null to unbind a default chord. Example: {\"ctrl+shift+d\": \"pane.splitRight\"}.",
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "default": {}
+    },
+    "session": {
+      "$ref": "#/$defs/SessionConfig",
+      "default": {
+        "restore": true,
+        "scrollback": true,
+        "scrollback_lines": 2000,
+        "resume_agents": false,
+        "persistent": false
+      }
+    },
+    "editor": {
+      "description": "How \"Find in Files\" results open. Unset: VS Code when installed, otherwise the system default app.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EditorConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "commands": {
+      "description": "Commands shown in the command palette for every project.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CustomCommand"
+      },
+      "default": []
+    },
+    "updates": {
+      "$ref": "#/$defs/UpdatesConfig",
+      "default": {
+        "channel": "stable",
+        "check": true
+      }
+    }
+  },
+  "$defs": {
+    "FontConfig": {
+      "type": "object",
+      "properties": {
+        "family": {
+          "description": "CSS font-family list.",
+          "type": "string",
+          "default": "\"Cascadia Code\", \"Cascadia Mono\", Consolas, \"Courier New\", monospace"
+        },
+        "size": {
+          "type": "number",
+          "format": "double",
+          "minimum": 6,
+          "maximum": 48,
+          "default": 14.0
+        },
+        "line_height": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0.8,
+          "maximum": 3.0,
+          "default": 1.1
+        }
+      }
+    },
+    "CursorConfig": {
+      "type": "object",
+      "properties": {
+        "style": {
+          "$ref": "#/$defs/CursorStyle",
+          "default": "bar"
+        },
+        "blink": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "CursorStyle": {
+      "type": "string",
+      "enum": [
+        "bar",
+        "block",
+        "underline"
+      ]
+    },
+    "Theme": {
+      "description": "Terminal colors (#rrggbb or #rrggbbaa).",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "background": {
+          "type": "string"
+        },
+        "foreground": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_background": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "black": {
+          "type": "string"
+        },
+        "red": {
+          "type": "string"
+        },
+        "green": {
+          "type": "string"
+        },
+        "yellow": {
+          "type": "string"
+        },
+        "blue": {
+          "type": "string"
+        },
+        "magenta": {
+          "type": "string"
+        },
+        "cyan": {
+          "type": "string"
+        },
+        "white": {
+          "type": "string"
+        },
+        "bright_black": {
+          "type": "string"
+        },
+        "bright_red": {
+          "type": "string"
+        },
+        "bright_green": {
+          "type": "string"
+        },
+        "bright_yellow": {
+          "type": "string"
+        },
+        "bright_blue": {
+          "type": "string"
+        },
+        "bright_magenta": {
+          "type": "string"
+        },
+        "bright_cyan": {
+          "type": "string"
+        },
+        "bright_white": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "background",
+        "foreground",
+        "black",
+        "red",
+        "green",
+        "yellow",
+        "blue",
+        "magenta",
+        "cyan",
+        "white",
+        "bright_black",
+        "bright_red",
+        "bright_green",
+        "bright_yellow",
+        "bright_blue",
+        "bright_magenta",
+        "bright_cyan",
+        "bright_white"
+      ]
+    },
+    "TerminalConfig": {
+      "type": "object",
+      "properties": {
+        "scrollback": {
+          "description": "Lines of scrollback kept per terminal.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "maximum": 200000,
+          "default": 20000
+        },
+        "copy_on_select": {
+          "description": "Copy selected text to the clipboard as soon as it is selected.",
+          "type": "boolean",
+          "default": false
+        },
+        "confirm_multiline_paste": {
+          "description": "Ask before pasting more than one line into a shell that doesn't use bracketed paste.",
+          "type": "boolean",
+          "default": true
+        },
+        "bell": {
+          "$ref": "#/$defs/BellMode",
+          "default": "attention"
+        },
+        "tmux_shim": {
+          "description": "Put a tmux-compatible `tmux` command on PATH (and set $TMUX) in local terminals, so tools\nthat drive tmux (e.g. Claude Code agent teams) open native Hivetty splits instead.",
+          "type": "boolean",
+          "default": true
+        },
+        "wsl_shell_integration": {
+          "description": "Load Hivetty shell integration in WSL terminals whose login shell is bash\n(reports the working directory and prompt marks).",
+          "type": "boolean",
+          "default": true
+        },
+        "screen_reader": {
+          "description": "Expose terminal output to screen readers (Narrator, NVDA, JAWS). Costs some speed.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "BellMode": {
+      "description": "What a BEL character does in a pane you aren't looking at.",
+      "oneOf": [
+        {
+          "description": "Mark the pane as needing attention (blue ring).",
+          "type": "string",
+          "const": "attention"
+        },
+        {
+          "description": "Attention ring plus a short sound.",
+          "type": "string",
+          "const": "sound"
+        },
+        {
+          "description": "Ignore bells.",
+          "type": "string",
+          "const": "none"
+        }
+      ]
+    },
+    "CustomProfile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Unique id, used by `default_profile` and `hivetty new --profile`.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "command": {
+          "description": "Executable path or name on PATH.",
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "shell": {
+          "description": "Shell family for shell integration: pwsh, powershell, cmd, bash, wsl or other. Guessed from `command` when unset.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cwd": {
+          "description": "Starting directory when no other cwd applies.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "description": "Extra environment variables.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "command"
+      ]
+    },
+    "SessionConfig": {
+      "type": "object",
+      "properties": {
+        "restore": {
+          "description": "Reopen workspaces, tabs, splits, working directories and browser URLs on launch.",
+          "type": "boolean",
+          "default": true
+        },
+        "scrollback": {
+          "description": "Save and restore terminal scrollback (secret-looking values are redacted first).",
+          "type": "boolean",
+          "default": true
+        },
+        "scrollback_lines": {
+          "description": "Maximum scrollback lines saved per terminal.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 2000
+        },
+        "resume_agents": {
+          "description": "Automatically resume recorded agent sessions (e.g. `claude --resume <id>`) on restore.\nWhen false, restored panes offer a Resume button instead.",
+          "type": "boolean",
+          "default": false
+        },
+        "persistent": {
+          "description": "Keep shells running after Hivetty closes: new terminals run in a detached session host\n(`hivetty-host.exe`) and are reattached, still running, on the next launch.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "EditorConfig": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "description": "Command template. Placeholders: {file}, {line}, {col}. Example: \"nvim +{line} {file}\".",
+          "type": "string"
+        },
+        "terminal": {
+          "description": "Run inside a new Hivetty split (true, for terminal editors) or as a separate program (false).",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "command"
+      ]
+    },
+    "CustomCommand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name shown in the command palette.",
+          "type": "string"
+        },
+        "command": {
+          "description": "Shell command line to run.",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/CommandTarget",
+          "default": "split-right"
+        },
+        "cwd": {
+          "description": "Working directory; relative paths resolve against the project file's folder.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "description": "Shell profile id to run it in (new panes only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keybinding": {
+          "description": "Key chord that runs this command (user config only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "command"
+      ]
+    },
+    "CommandTarget": {
+      "description": "Where a custom command runs.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "split-right",
+            "split-down",
+            "tab",
+            "workspace"
+          ]
+        },
+        {
+          "description": "Type it into the focused terminal.",
+          "type": "string",
+          "const": "current"
+        }
+      ]
+    },
+    "UpdatesConfig": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/UpdateChannel",
+          "default": "stable"
+        },
+        "check": {
+          "description": "Check for updates at startup and every few hours (you're asked before anything installs).",
+          "type": "boolean",
+          "default": true
+        },
+        "endpoint": {
+          "description": "Update manifest URL, overriding the built-in one. `{{channel}}` becomes stable or nightly.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "UpdateChannel": {
+      "description": "Which builds the updater offers.",
+      "oneOf": [
+        {
+          "description": "Tested releases.",
+          "type": "string",
+          "const": "stable"
+        },
+        {
+          "description": "A build of the latest code every day; may be rough.",
+          "type": "string",
+          "const": "nightly"
+        }
+      ]
+    }
+  }
+}

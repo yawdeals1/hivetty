@@ -1,0 +1,23 @@
+[package]
+name = "hivetty-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "hivetty"
+path = "src/main.rs"
+
+[[bin]]
+name = "tmux"
+path = "src/tmux.rs"
+
+[dependencies]
+hivetty-core = { path = "../hivetty-core" }
+serde_json = { workspace = true, features = ["preserve_order"] }
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+toml_edit = "0.23"
+anyhow = "1"
+winreg = "0.56"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
