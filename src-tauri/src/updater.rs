@@ -133,22 +133,30 @@ pub async fn install(app: &AppHandle, progress: Channel<Progress>) -> Result<(),
     }
     set(app, |s| s.state = "downloading");
     let mut downloaded = 0u64;
-    let result = update
-        .download_and_install(
-            |chunk, total| {
-                downloaded += chunk as u64;
-                let _ = progress.send(Progress { downloaded, total });
-            },
-            || {
-                let _ = app.emit("update-status", Status { state: "installing", ..status(app) });
-            },
-        )
-        .await;
+    let result = async {
+        // download() verifies the package signature against the public key before returning
+        let bytes = update
+            .download(
+                |chunk, total| {
+                    downloaded += chunk as u64;
+                    let _ = progress.send(Progress { downloaded, total });
+                },
+                || {},
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        let _ = app.emit("update-status", Status { state: "installing", ..status(app) });
+        if bytes.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]) {
+            // MSI (per-machine install): the plugin runs msiexec and exits.
+            update.install(bytes).map_err(|e| e.to_string())
+        } else {
+            run_nsis_update(app, &update.version, &bytes)
+        }
+    }
+    .await;
     match result {
-        // On Windows the installer has been started and exits us; restart covers other cases.
         Ok(()) => app.restart(),
         Err(e) => {
-            let e = e.to_string();
             set(app, |s| {
                 s.state = "error";
                 s.error = Some(e.clone());
@@ -156,6 +164,39 @@ pub async fn install(app: &AppHandle, progress: Channel<Progress>) -> Result<(),
             Err(e)
         }
     }
+}
+
+/// Start the NSIS installer in update mode and end this process at once.
+///
+/// The plugin's own path starts the installer and then calls `exit()`, which with WebView2 loaded
+/// can take long enough that the installer's "is Hivetty running?" check catches the exiting
+/// process and aborts ("insufficient permissions to close Hivetty"). Instead the installer gets
+/// our pid (`/WAITPID`, see windows/installer-hooks.nsh) and waits for us to be gone, and we
+/// terminate immediately (the session was saved; hosted shells keep running).
+fn run_nsis_update(app: &AppHandle, version: &str, bytes: &[u8]) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    let dir = std::env::temp_dir().join(format!("hivetty-update-{version}"));
+    std::fs::create_dir_all(&dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+    let exe = dir.join(format!("Hivetty_{version}_x64-setup.exe"));
+    std::fs::write(&exe, bytes).map_err(|e| format!("writing {}: {e}", exe.display()))?;
+    let args = ["/P".to_string(), "/UPDATE".into(), "/R".into(), format!("/WAITPID={}", std::process::id())];
+    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+    // Leave any job object we're in, so ending this process can't take the installer with it.
+    std::process::Command::new(&exe)
+        .args(&args)
+        .current_dir(&dir)
+        .creation_flags(CREATE_BREAKAWAY_FROM_JOB)
+        .spawn()
+        .or_else(|_| std::process::Command::new(&exe).args(&args).current_dir(&dir).spawn())
+        .map_err(|e| format!("starting the installer: {e}"))?;
+    if let Some(h) = app.state::<AppState>().ptys.existing_host() {
+        h.flush();
+    }
+    unsafe {
+        use windows_sys::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
+    Ok(())
 }
 
 /// Periodic background checks (when `updates.check` is on). Found updates show in the UI;

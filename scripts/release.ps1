@@ -79,7 +79,8 @@ foreach ($exe in 'hivetty.exe', 'tmux.exe', 'hivetty-host.exe') {
 }
 
 # 2. Release-only Tauri config, merged over tauri.conf.json.
-$signCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$sign`" `"%1`""
+# Structured form: Tauri runs it without a shell, so no quoting (it would pass quotes literally).
+$signCmd = [ordered]@{ cmd = 'powershell'; args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $sign, '%1') }
 $release = [ordered]@{
     version = $Version
     bundle  = [ordered]@{
