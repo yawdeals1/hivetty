@@ -1,0 +1,83 @@
+# Daily build of main as the rolling `nightly` pre-release. Copies on the nightly channel read
+# releases/download/nightly/latest.json. Skipped when main hasn't changed since the last nightly.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Anything new since the last nightly?
+        id: check
+        shell: pwsh
+        run: |
+          $last = git rev-parse -q --verify 'refs/tags/nightly^{commit}' 2>$null
+          $head = git rev-parse HEAD
+          $skip = ($last -eq $head) -and ('${{ github.event_name }}' -eq 'schedule')
+          "skip=$($skip.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          # nightly versions sort just above the latest stable release
+          $stable = gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName'
+          if (-not $stable) { $stable = 'v' + (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version }
+          "base=$($stable -replace '^v','')" >> $env:GITHUB_OUTPUT
+
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.check.outputs.skip != 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.check.outputs.skip != 'true'
+
+      - name: Build installer
+        if: steps.check.outputs.skip != 'true'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Repository secret TAURI_SIGNING_PRIVATE_KEY is missing' }
+          pnpm install --frozen-lockfile
+          ./scripts/release.ps1 -Channel nightly -Version '${{ steps.check.outputs.base }}' `
+            -Notes "Nightly build of $(git rev-parse --short HEAD)" `
+            -DownloadBase "https://github.com/${{ github.repository }}/releases/download/nightly"
+
+      - name: Publish the nightly pre-release
+        if: steps.check.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem dist/nightly -Directory | Select-Object -First 1
+          git tag -f nightly
+          git push -f origin refs/tags/nightly
+          gh release view nightly *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create nightly --prerelease --title 'Nightly' --notes 'Daily build of main. Settings → Updates → Channel: Nightly.'
+          } else {
+            # drop the previous build's files (names include the version)
+            gh release view nightly --json assets --jq '.assets[].name' | ForEach-Object { gh release delete-asset nightly $_ -y }
+          }
+          $files = Get-ChildItem $dir.FullName -File | ForEach-Object FullName
+          gh release upload nightly @files --clobber

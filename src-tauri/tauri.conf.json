@@ -52,7 +52,7 @@
         "silent": true
       },
       "nsis": {
-        "installMode": "currentUser",
+        "installMode": "perMachine",
         "installerHooks": "windows/installer-hooks.nsh",
         "installerIcon": "icons/icon.ico",
         "displayLanguageSelector": false

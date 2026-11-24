@@ -1,0 +1,98 @@
+# Every published GitHub release (tag vX.Y.Z) gets installers + latest.json attached.
+# Installed copies on the stable channel read releases/latest/download/latest.json, so publishing
+# a (non-pre-)release is all it takes to roll out an update.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to (re)build, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # the rolling nightly pre-release is built by nightly.yml
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name != 'nightly'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      NOTES: ${{ github.event.release.body }}
+      GH_TOKEN: ${{ github.token }}
+      HAS_PFX: ${{ secrets.HIVETTY_SIGN_PFX_BASE64 != '' }}
+    steps:
+      - name: Already built?
+        id: check
+        shell: pwsh
+        run: |
+          # A release published with its files already attached (e.g. built locally with
+          # scripts/release.ps1) is left alone; run the workflow by hand to rebuild it.
+          $assets = gh release view $env:TAG --repo ${{ github.repository }} --json assets --jq '.assets[].name'
+          $skip = ('${{ github.event_name }}' -eq 'release') -and ($assets -contains 'latest.json')
+          "skip=$($skip.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.check.outputs.skip != 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.check.outputs.skip != 'true'
+
+      - name: Install JS dependencies
+        if: steps.check.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Code-signing certificate (optional)
+        if: steps.check.outputs.skip != 'true' && env.HAS_PFX == 'true'
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.HIVETTY_SIGN_PFX_BASE64 }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_B64))
+          "HIVETTY_SIGN_PFX=$pfx" >> $env:GITHUB_ENV
+
+      - name: Build installers
+        if: steps.check.outputs.skip != 'true'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          HIVETTY_SIGN_PFX_PASSWORD: ${{ secrets.HIVETTY_SIGN_PFX_PASSWORD }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Repository secret TAURI_SIGNING_PRIVATE_KEY is missing (updates must be signed)' }
+          $version = $env:TAG -replace '^v', ''
+          ./scripts/release.ps1 -Channel stable -Version $version -Notes "$env:NOTES" `
+            -DownloadBase "https://github.com/${{ github.repository }}/releases/download/$env:TAG"
+
+      - name: Attach to the release
+        if: steps.check.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          $version = $env:TAG -replace '^v', ''
+          $dir = "dist/stable/$version"
+          Compress-Archive -Path "$dir/winget/*" -DestinationPath "$dir/winget-manifests.zip" -Force
+          $files = Get-ChildItem $dir -File | ForEach-Object FullName
+          gh release upload $env:TAG @files --clobber

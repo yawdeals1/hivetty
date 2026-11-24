@@ -1,54 +1,71 @@
 # Releasing Hivetty
 
+Releases live on GitHub (`yawdeals1/hivetty`). Installed copies check for updates at startup and
+every few hours:
+
+- **Stable** reads `https://github.com/yawdeals1/hivetty/releases/latest/download/latest.json`,
+  the `latest.json` attached to the newest published (non-pre-)release.
+- **Nightly** reads `https://github.com/yawdeals1/hivetty/releases/download/nightly/latest.json`,
+  the rolling `nightly` pre-release (`.github/workflows/nightly.yml`, daily when `main` changed).
+
+So **publishing a GitHub release is what rolls out an update.** `.github/workflows/release.yml`
+builds the installers for every published release and attaches them with `latest.json`.
+
+> **The repository is private.** GitHub only serves release files of a private repository to
+> signed-in users with access, so installed copies get "not found" when checking and can't
+> update, and the download links only work for you. Making the repository public, or publishing
+> releases from a separate public repository (change the two URLs in `src-tauri/src/updater.rs`
+> and `-DownloadBase`), makes updates work with no other changes.
+
 ## One-time setup
 
-- **Updater key.** Updates are verified against the public key in `src-tauri/tauri.conf.json`
-  (`plugins.updater.pubkey`). The matching private key is `~/.tauri/hivetty-updater.key` on the
-  release machine. Back it up somewhere safe: without it, installed copies can't be updated.
-  For CI, put its contents in `TAURI_SIGNING_PRIVATE_KEY` (and the password, if any, in
-  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
-- **Code signing (optional, recommended).** Set one of these before building (see
-  `scripts/sign.ps1`):
-  - `HIVETTY_SIGN_THUMBPRINT`: a code-signing certificate in the Windows certificate store
-  - `HIVETTY_SIGN_PFX` + `HIVETTY_SIGN_PFX_PASSWORD`: a .pfx file
-  - `HIVETTY_SIGN_COMMAND`: any signing command; `{file}` is replaced with the file path
-    (e.g. Azure Trusted Signing)
+- **Updater key (required).** Updates are verified against the public key in
+  `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`). The private key is
+  `~/.tauri/hivetty-updater.key`; back it up. Without it, installed copies can never be updated.
+  Give it to the workflow as a repository secret:
 
-  Set `HIVETTY_SIGN_REQUIRED=1` to fail the build instead of shipping unsigned files.
-- **Hosting.** Pick where installers and the update manifest are served from (HTTPS). The
-  manifest URL is baked into each build with `-UpdateEndpoint`; `{{channel}}` in it becomes
-  `stable` or `nightly`. Users can override it with `updates.endpoint` in hivetty.json.
+  ```powershell
+  Get-Content $HOME\.tauri\hivetty-updater.key -Raw | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo yawdeals1/hivetty
+  ```
+
+  (If the key has a password, also set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.)
+- **Code signing (optional, recommended).** Unsigned installers trigger SmartScreen warnings.
+  Locally, set one of `HIVETTY_SIGN_THUMBPRINT`, `HIVETTY_SIGN_PFX` (+ `HIVETTY_SIGN_PFX_PASSWORD`)
+  or `HIVETTY_SIGN_COMMAND` (see `scripts/sign.ps1`). In CI, add the secrets
+  `HIVETTY_SIGN_PFX_BASE64` (the .pfx, base64) and `HIVETTY_SIGN_PFX_PASSWORD`.
 
 ## Cutting a release
 
-1. Bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`'s workspace version).
-2. Build:
+1. Bump `version` in `src-tauri/tauri.conf.json` and the workspace `Cargo.toml`, commit, push.
+2. Create the release (this publishes it and starts the build):
 
    ```powershell
-   .\scripts\release.ps1 -Channel stable `
-       -DownloadBase   'https://example.com/hivetty/{{channel}}/{{version}}' `
-       -UpdateEndpoint 'https://example.com/hivetty/{{channel}}/latest.json' `
-       -Notes 'What changed'
+   gh release create v0.2.0 --title "Hivetty 0.2.0" --notes "What changed"
    ```
 
-   Nightly: `-Channel nightly` (version becomes `<version>-nightly.<UTC timestamp>`, NSIS only).
-3. Upload `dist\<channel>\<version>\*` to the download location, **then** replace
-   `<channel>/latest.json` with the new `latest.json`. Running copies pick it up within hours
-   (or at once with Settings → Updates → Check now, or `hivetty update`).
-4. Stable only: submit `dist\stable\<version>\winget\` to `microsoft/winget-pkgs` under
-   `manifests\h\Hivetty\Hivetty\<version>\` (the script already ran `winget validate`).
+   The workflow attaches `Hivetty_<v>_x64-setup.exe`, the MSI, their `.sig` files,
+   `latest.json` and `winget-manifests.zip` (~20 min). Installed copies offer the update once
+   `latest.json` is attached. A pre-release is never "latest", so it doesn't reach stable users.
+3. Optional: submit `winget-manifests.zip`'s contents to `microsoft/winget-pkgs` under
+   `manifests\h\Hivetty\Hivetty\<version>\`.
+
+To build a release by hand instead, run `scripts/release.ps1` (see its header) and upload
+`dist\stable\<version>\*` with `gh release upload`. A release that already has `latest.json`
+attached when it's published is left alone by the workflow (run the workflow manually with the
+tag to rebuild it).
 
 ## What the installers do
 
-- **NSIS** (`*-setup.exe`, per-user, `%LOCALAPPDATA%\Hivetty`; also what the updater installs):
-  puts `bin\` (only `hivetty.exe`) on the user PATH; uninstall stops the session host, removes
-  the PATH entry and `%LOCALAPPDATA%\Hivetty\runtime`. Settings and sessions in
+- **NSIS** (`*-setup.exe`; also what the updater installs) installs for all users in
+  `C:\Program Files\Hivetty` and asks for administrator permission (UAC), on install and on each
+  update. It puts `bin\` (only `hivetty.exe`) on the machine PATH; uninstall stops the session
+  host, removes the PATH entry and `%LOCALAPPDATA%\Hivetty\runtime`. Settings and sessions in
   `%APPDATA%\Hivetty` are kept. Hooks: `src-tauri/windows/installer-hooks.nsh`.
-- **MSI** (per-machine, Program Files): adds `bin\` to the machine PATH
-  (`src-tauri/windows/path-fragment.wxs`).
-- In-app updates start the NSIS installer with `/P /UPDATE /R /WAITPID=<pid>`. The installer
-  waits for the old process to end, then waits until nothing (e.g. an antivirus scan) holds the
-  old exe, so it never aborts with "insufficient permissions to close Hivetty".
+- **MSI**: the same, per-machine (`src-tauri/windows/path-fragment.wxs`).
+- In-app updates start the NSIS installer elevated with `/P /UPDATE /R /WAITPID=<pid>`; if the
+  UAC prompt is declined, Hivetty keeps running. The installer waits for the old process to end,
+  then until nothing (e.g. an antivirus scan) holds the old exe, so it never aborts with
+  "insufficient permissions to close Hivetty".
 
 ## Testing an update locally
 

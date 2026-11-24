@@ -3,22 +3,21 @@
   Build a signed Hivetty release: installers, updater manifest and (stable) winget manifests.
 
 .EXAMPLE
-  # Stable release, uploaded to https://downloads.example.com/hivetty/stable/0.2.0/
-  .\scripts\release.ps1 -Channel stable `
-      -DownloadBase 'https://downloads.example.com/hivetty/{{channel}}/{{version}}' `
-      -UpdateEndpoint 'https://downloads.example.com/hivetty/{{channel}}/latest.json'
+  # Stable release for GitHub release v0.2.0 (what .github/workflows/release.yml runs)
+  .\scripts\release.ps1 -Channel stable -Version 0.2.0 `
+      -DownloadBase 'https://github.com/yawdeals1/hivetty/releases/download/v{{version}}'
 
 .EXAMPLE
-  # Nightly (version becomes <base>-nightly.<yyyyMMddHHmm>, NSIS only)
-  .\scripts\release.ps1 -Channel nightly -DownloadBase ... -UpdateEndpoint ...
+  # Nightly (version becomes <base with patch+1>-nightly.<yyyyMMddHHmm>, NSIS only)
+  .\scripts\release.ps1 -Channel nightly -DownloadBase 'https://github.com/yawdeals1/hivetty/releases/download/nightly'
 
 .DESCRIPTION
   Output goes to dist\<channel>\<version>\:
-    Hivetty_<version>_x64-setup.exe (+ .sig)   per-user NSIS installer, also used by the updater
+    Hivetty_<version>_x64-setup.exe (+ .sig)   NSIS installer (C:\Program Files\Hivetty), used by the updater
     Hivetty_<version>_x64_en-US.msi (+ .sig)   per-machine MSI (stable only)
-    latest.json                                updater manifest; publish it at -UpdateEndpoint
+    latest.json                                updater manifest (installed copies read the release's)
     winget\                                    winget manifests (stable only)
-  Upload the installers to -DownloadBase, then replace latest.json at the update endpoint.
+  Upload everything to the release that -DownloadBase points at.
 
   Code signing: see scripts\sign.ps1 (HIVETTY_SIGN_THUMBPRINT / HIVETTY_SIGN_PFX /
   HIVETTY_SIGN_COMMAND). Updater signing: TAURI_SIGNING_PRIVATE_KEY (key text or path; defaults to
@@ -30,8 +29,9 @@ param(
     [string]$Version,
     # Where the installers will be downloadable from; {{channel}} and {{version}} are filled in.
     [Parameter(Mandatory = $true)][string]$DownloadBase,
-    # Update manifest URL baked into the build; {{channel}} is filled in at runtime.
-    [Parameter(Mandatory = $true)][string]$UpdateEndpoint,
+    # Update manifest URL baked into the build ({{channel}} is filled in at runtime). Default: the
+    # GitHub Releases URLs built into the app (newest release / rolling `nightly` pre-release).
+    [string]$UpdateEndpoint,
     [string]$Notes = '',
     [switch]$SkipMsi,
     # LOCAL TESTING ONLY: let the updater use plain http (e.g. a 127.0.0.1 test server).
@@ -45,7 +45,9 @@ Set-Location $root
 $conf = Get-Content src-tauri\tauri.conf.json -Raw | ConvertFrom-Json
 if (-not $Version) { $Version = $conf.version }
 if ($Channel -eq 'nightly') {
-    $Version = "$($Version -replace '-.*$', '')-nightly.$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmm'))"
+    # next patch version's pre-release, so it sorts above the stable release it's based on
+    $base = [version]($Version -replace '-.*$', '')
+    $Version = "$($base.Major).$($base.Minor).$($base.Build + 1)-nightly.$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmm'))"
 }
 $buildMsi = ($Channel -eq 'stable') -and -not $SkipMsi
 $targets = @('nsis')
@@ -104,7 +106,12 @@ New-Item -ItemType Directory -Force (Split-Path $releaseConf) | Out-Null
 Write-Utf8 $releaseConf ($release | ConvertTo-Json -Depth 8)
 
 # 3. Build and bundle.
-$env:HIVETTY_UPDATE_ENDPOINT = $UpdateEndpoint
+if ($UpdateEndpoint) {
+    $env:HIVETTY_UPDATE_ENDPOINT = $UpdateEndpoint
+    $env:HIVETTY_UPDATE_ENDPOINT_NIGHTLY = $UpdateEndpoint
+} else {
+    Remove-Item Env:HIVETTY_UPDATE_ENDPOINT, Env:HIVETTY_UPDATE_ENDPOINT_NIGHTLY -ErrorAction SilentlyContinue
+}
 $bundleDir = Join-Path $root 'target\release\bundle'
 if (Test-Path $bundleDir) { Remove-Item -Recurse -Force $bundleDir }
 pnpm tauri build --config $releaseConf

@@ -1,14 +1,15 @@
-; Hivetty additions to the Tauri NSIS installer (per-user install).
+; Hivetty additions to the Tauri NSIS installer (per-machine install: C:\Program Files\Hivetty,
+; runs elevated).
 ;
-; Install: put $INSTDIR\bin (holding only hivetty.exe) on the user's PATH.
+; Install: put $INSTDIR\bin (holding only hivetty.exe) on the machine PATH.
 ; Real uninstall (not the uninstall step of an update): stop the detached session host, take
 ; bin off PATH, and remove the runtime copies of tmux.exe / hivetty-host.exe.
 ; User settings and sessions in %APPDATA%\Hivetty are left alone.
 
 ; In-app updates start this installer with /WAITPID=<pid of the running Hivetty>, then end that
-; process. Wait (up to 20 s) until it's really gone: otherwise the installer's "is it running?"
-; check (Restart Manager) can catch it mid-exit and abort with "insufficient permissions to
-; close Hivetty".
+; process. Wait (up to 20 s) until it's really gone, then until nothing else (antivirus scanners,
+; seen: McAfee, ~30 s) still holds the old exe: otherwise the installer's "is it running?" check
+; (Restart Manager) aborts with "insufficient permissions to close Hivetty".
 !macro NSIS_HOOK_PREINSTALL
   ClearErrors
   ${GetOptions} $CMDLINE "/WAITPID=" $R9
@@ -21,9 +22,6 @@
     ${EndIf}
   ${EndIf}
   ${If} $UpdateMode = 1
-    ; Antivirus scanners (seen: McAfee) keep the just-closed exe open for up to ~30 s, which the
-    ; installer's check reports as "insufficient permissions to close Hivetty". Wait (up to 60 s)
-    ; until Restart Manager reports nothing holding it.
     DetailPrint "Waiting for Hivetty's files to be released..."
     System::Call '*(&w520 "$INSTDIR\${MAINBINARYNAME}.exe") p .R4'
     System::Call '*(p R4) p .R3'
@@ -48,7 +46,7 @@
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
-  nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" setup-path --add "$INSTDIR\bin"'
+  nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" setup-path --machine --add "$INSTDIR\bin"'
   Pop $0
 !macroend
 
@@ -57,7 +55,7 @@
     ${If} ${FileExists} "$INSTDIR\bin\hivetty.exe"
       nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" host stop'
       Pop $0
-      nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" setup-path --remove "$INSTDIR\bin"'
+      nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" setup-path --machine --remove "$INSTDIR\bin"'
       Pop $0
     ${EndIf}
   ${EndIf}
@@ -65,8 +63,11 @@
 
 !macro NSIS_HOOK_POSTUNINSTALL
   ${If} $UpdateMode <> 1
-    RMDir /r /REBOOTOK "$LOCALAPPDATA\Hivetty\runtime"
-    RMDir "$INSTDIR\bin"
-    RMDir "$INSTDIR"
+    ; the installing user's own %LOCALAPPDATA% ($LOCALAPPDATA means all-users here)
+    ReadEnvStr $0 LOCALAPPDATA
+    ${If} $0 != ""
+      RMDir /r /REBOOTOK "$0\Hivetty\runtime"
+      RMDir "$0\Hivetty"
+    ${EndIf}
   ${EndIf}
 !macroend
