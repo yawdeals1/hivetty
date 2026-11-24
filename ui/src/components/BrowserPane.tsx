@@ -132,6 +132,7 @@ export function BrowserPane({ pane, focused, multi }: { pane: Pane; focused: boo
         </div>
         <button title="Import from Chrome/Edge" className={importing ? "on" : ""} onClick={() => setImporting((v) => !v)}>⬇</button>
         <button title="Developer tools" onClick={() => api.browserDevtools(pane.id)}>⚙</button>
+        <button title="Close browser pane (Ctrl+Shift+W)" onClick={() => api.closePane(pane.id)}>×</button>
       </div>
       {importing && <ImportMenu pane={pane.id} onClose={() => setImporting(false)} />}
       <div ref={slot} className="browser-slot">

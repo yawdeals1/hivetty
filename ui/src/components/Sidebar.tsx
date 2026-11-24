@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { paneLabel, panesOf, shortPath, useStore, workspaceUnread } from "../state/store";
 import type { Model, Workspace } from "../types";
 import { openPort, openUrl } from "../lib/open";
+import { AttentionMenu } from "./AttentionMenu";
 
 const COLORS = ["", "#f5b53d", "#5fa8ff", "#8fd18b", "#ef6b73", "#c98bf5", "#5fd1d1"];
 
@@ -56,6 +57,9 @@ export function Sidebar() {
             }}
           />
         ))}
+      </div>
+      <div className="sidebar-footer">
+        <AttentionMenu />
       </div>
     </aside>
   );

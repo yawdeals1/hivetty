@@ -6,16 +6,152 @@ use hivetty_core::layout::PaneId;
 use hivetty_core::model::PaneKind;
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tauri::webview::{NewWindowResponse, WebviewBuilder};
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Rect, Webview, WebviewUrl};
-use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2;
-use webview2_com::{CallDevToolsProtocolMethodCompletedHandler, CoTaskMemPWSTR, DevToolsProtocolEventReceivedEventHandler};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Webview, WebviewUrl};
+use webview2_com::Microsoft::Web::WebView2::Win32::{
+    ICoreWebView2, COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN, COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN,
+    COREWEBVIEW2_PHYSICAL_KEY_STATUS,
+};
+use webview2_com::{AcceleratorKeyPressedEventHandler, CallDevToolsProtocolMethodCompletedHandler, CoTaskMemPWSTR, DevToolsProtocolEventReceivedEventHandler, FocusChangedEventHandler};
 use windows::core::{HSTRING, PWSTR};
 
 const LOG_CAP: usize = 500;
+
+/// Chords bound to app actions (same format as the UI's `chordOf`, e.g. "ctrl+shift+w").
+/// A focused browser webview swallows keys, so these are intercepted natively and forwarded.
+static APP_CHORDS: LazyLock<parking_lot::RwLock<HashSet<String>>> = LazyLock::new(Default::default);
+
+pub fn set_app_chords(chords: Vec<String>) {
+    *APP_CHORDS.write() = chords.into_iter().collect();
+}
+
+fn vk_key_name(vk: u32) -> Option<String> {
+    let s = match vk {
+        0x41..=0x5A => return Some(((vk as u8) as char).to_ascii_lowercase().to_string()),
+        0x30..=0x39 => return Some(((vk as u8) as char).to_string()),
+        0x70..=0x87 => return Some(format!("f{}", vk - 0x6F)),
+        0x08 => "backspace",
+        0x09 => "tab",
+        0x0D => "enter",
+        0x1B => "escape",
+        0x20 => "space",
+        0x21 => "pageup",
+        0x22 => "pagedown",
+        0x23 => "end",
+        0x24 => "home",
+        0x25 => "arrowleft",
+        0x26 => "arrowup",
+        0x27 => "arrowright",
+        0x28 => "arrowdown",
+        0x2D => "insert",
+        0x2E => "delete",
+        0xBA => ";",
+        0xBB => "=",
+        0xBC => ",",
+        0xBD => "-",
+        0xBE => ".",
+        0xBF => "/",
+        0xC0 => "`",
+        0xDB => "[",
+        0xDD => "]",
+        _ => return None,
+    };
+    Some(s.to_string())
+}
+
+/// Build a chord from the current modifier state + virtual key, or None for keys we never take.
+fn chord_from_vk(vk: u32) -> Option<String> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT};
+    let down = |k: u16| unsafe { GetKeyState(k as i32) } < 0;
+    let key = vk_key_name(vk)?;
+    let (ctrl, alt, shift, meta) = (down(VK_CONTROL), down(VK_MENU), down(VK_SHIFT), down(VK_LWIN) || down(VK_RWIN));
+    // Never steal plain typing from the page: require a non-Shift modifier unless it's an F-key.
+    if !(ctrl || alt || meta) && !(key.starts_with('f') && key.len() > 1) {
+        return None;
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    if ctrl {
+        parts.push("ctrl");
+    }
+    if alt {
+        parts.push("alt");
+    }
+    if shift {
+        parts.push("shift");
+    }
+    if meta {
+        parts.push("meta");
+    }
+    parts.push(&key);
+    Some(parts.join("+"))
+}
+
+/// Mark the browser pane focused in the model (clicks inside the native webview never reach the UI).
+fn focus_in_model(app: &AppHandle, pane: PaneId) {
+    let st = app.state::<AppState>();
+    let changed = st.model.lock().focus_pane(pane);
+    if changed {
+        emit_state(app);
+    }
+}
+
+/// Run an app shortcut pressed while a browser webview had keyboard focus.
+fn forward_shortcut(app: &AppHandle, pane: PaneId, chord: String) {
+    focus_in_model(app, pane);
+    // Give keyboard focus back to the app UI so overlays (palette, rename…) receive typing.
+    if let Some(main) = app.get_webview("main") {
+        let _ = main.set_focus();
+    }
+    let _ = app.emit_to("main", "app-shortcut", chord);
+}
+
+/// Intercept app shortcuts and track focus on a browser pane's WebView2 controller.
+fn hook_shortcuts(wv: &Webview, app: AppHandle, pane: PaneId) {
+    let _ = wv.with_webview(move |pw| {
+        let ctl = pw.controller();
+        let a1 = app.clone();
+        let keys = AcceleratorKeyPressedEventHandler::create(Box::new(move |_, args| {
+            let Some(args) = args else { return Ok(()) };
+            let mut kind = COREWEBVIEW2_KEY_EVENT_KIND::default();
+            unsafe { args.KeyEventKind(&mut kind)? };
+            if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN && kind != COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN {
+                return Ok(());
+            }
+            let mut vk = 0u32;
+            unsafe { args.VirtualKey(&mut vk)? };
+            let Some(chord) = chord_from_vk(vk) else { return Ok(()) };
+            if !APP_CHORDS.read().contains(&chord) {
+                return Ok(());
+            }
+            unsafe { args.SetHandled(true)? };
+            // Swallow auto-repeat, but only act on the first press (holding Ctrl+Shift+W
+            // must not close pane after pane).
+            let mut status = COREWEBVIEW2_PHYSICAL_KEY_STATUS::default();
+            unsafe { args.PhysicalKeyStatus(&mut status)? };
+            if status.WasKeyDown.as_bool() {
+                return Ok(());
+            }
+            // Defer: closing this webview from inside its own event handler isn't safe.
+            let app = a1.clone();
+            let _ = a1.run_on_main_thread(move || forward_shortcut(&app, pane, chord));
+            Ok(())
+        }));
+        let a2 = app.clone();
+        let focus = FocusChangedEventHandler::create(Box::new(move |_, _| {
+            let app = a2.clone();
+            let _ = a2.run_on_main_thread(move || focus_in_model(&app, pane));
+            Ok(())
+        }));
+        let (mut t1, mut t2) = (0i64, 0i64);
+        unsafe {
+            let _ = ctl.add_AcceleratorKeyPressed(&keys, &mut t1);
+            let _ = ctl.add_GotFocus(&focus, &mut t2);
+        }
+    });
+}
 
 #[derive(Default)]
 struct Logs {
@@ -149,6 +285,7 @@ impl BrowserManager {
         let _ = wv.hide();
         let logs = Arc::new(Mutex::new(Logs::default()));
         hook_events(&wv, logs.clone());
+        hook_shortcuts(&wv, app.clone(), pane);
         self.entries.lock().insert(pane, Entry { label, refs: HashMap::new(), logs, visible: false, bounds: (0.0, 0.0, 0.0, 0.0) });
         Ok(())
     }

@@ -18,8 +18,10 @@ builds the installers for every published release and attaches them with `latest
   `~/.tauri/hivetty-updater.key`; back it up. Without it, installed copies can never be updated.
   Give it to the workflow as a repository secret:
 
-  ```powershell
-  Get-Content $HOME\.tauri\hivetty-updater.key -Raw | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo yawdeals1/hivetty
+  ```bash
+  # from Git Bash: redirect the file itself. Piping it through Windows PowerShell adds a UTF-8 BOM,
+  # which makes signing fail in CI ("Invalid symbol 239, offset 0").
+  gh secret set TAURI_SIGNING_PRIVATE_KEY --repo yawdeals1/hivetty < ~/.tauri/hivetty-updater.key
   ```
 
   (If the key has a password, also set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.)

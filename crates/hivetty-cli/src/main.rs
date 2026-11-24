@@ -46,6 +46,24 @@ impl DirArg {
 enum HookAgent {
     Claude,
     Codex,
+    Gemini,
+    Copilot,
+    Cursor,
+    Opencode,
+}
+
+impl From<HookAgent> for hivetty_core::hooks::Agent {
+    fn from(a: HookAgent) -> Self {
+        use hivetty_core::hooks::Agent;
+        match a {
+            HookAgent::Claude => Agent::Claude,
+            HookAgent::Codex => Agent::Codex,
+            HookAgent::Gemini => Agent::Gemini,
+            HookAgent::Copilot => Agent::Copilot,
+            HookAgent::Cursor => Agent::Cursor,
+            HookAgent::Opencode => Agent::OpenCode,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -58,7 +76,7 @@ enum Cmd {
         title: Option<String>,
         #[arg(long, env = ENV_PANE)]
         pane: Option<String>,
-        /// Read an agent hook payload (stdin for claude, last arg for codex) instead of BODY
+        /// Read a coding-agent hook payload (stdin, or the last argument for Codex's legacy notify) instead of BODY
         #[arg(long, value_name = "AGENT")]
         from_hook: Option<HookAgent>,
     },
@@ -287,7 +305,9 @@ fn main() {
     let cli = Cli::parse();
     // Hook mode must never break the agent: swallow all errors, exit 0.
     if let Cmd::Notify { from_hook: Some(agent), pane, .. } = &cli.cmd {
-        let _ = hooks_cmd::from_hook(*agent == HookAgent::Claude, pane.clone());
+        let _ = hooks_cmd::from_hook((*agent).into(), pane.clone());
+        // Some agents (Gemini CLI, Codex Stop) require JSON on stdout; `{}` means "no decision".
+        println!("{{}}");
         return;
     }
     if let Err(e) = run(cli) {
@@ -337,8 +357,8 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Cmd::Hooks { action } => match action {
-            HooksAction::Setup { agent } => hooks_cmd::setup(agent.map(|a| a == HookAgent::Claude)),
-            HooksAction::Remove { agent } => hooks_cmd::remove(agent.map(|a| a == HookAgent::Claude)),
+            HooksAction::Setup { agent } => hooks_cmd::setup(agent.map(Into::into)),
+            HooksAction::Remove { agent } => hooks_cmd::remove(agent.map(Into::into)),
             HooksAction::Status => hooks_cmd::status(),
         },
         Cmd::Host { action } => host_cmd::run(action, j),

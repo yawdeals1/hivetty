@@ -44,6 +44,7 @@ export const api = {
   browserDevtools: (pane: Id) => invoke("browser_devtools", { pane }),
   browserOpen: (url: string, near?: Id) => invoke<Id>("browser_open", { url, near }),
   browserFocus: (pane: Id) => invoke("browser_focus", { pane }),
+  setAppShortcuts: (chords: string[]) => invoke("set_app_shortcuts", { chords }),
   getConfig: () => invoke<ConfigState>("get_config"),
   /** Set a setting by key path; `undefined` removes it so the default applies. */
   configSet: (path: string[], value: unknown) =>

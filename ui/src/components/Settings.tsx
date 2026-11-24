@@ -311,6 +311,9 @@ function TerminalSection({ c, save }: { c: Config; save: Save }) {
       <Row label="tmux compatibility" hint="Put a tmux-compatible command on PATH in local terminals so tools that drive tmux (e.g. Claude Code agent teams) open Hivetty splits. Applies to new terminals.">
         <Toggle checked={t.tmux_shim} onChange={(v) => save(["terminal", "tmux_shim"], v)} />
       </Row>
+      <Row label="Agent notifications" hint="When Hivetty starts, install its hooks into the coding agents you have (Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode), so an agent that finishes or needs input marks its pane, tab and workspace. Agents already running pick this up after a restart.">
+        <Toggle checked={t.agent_hooks} onChange={(v) => save(["terminal", "agent_hooks"], v)} />
+      </Row>
       <Row label="WSL shell integration" hint="In WSL terminals whose login shell is bash, report the folder and prompt marks so splits, git info and Find in Files follow you.">
         <Toggle checked={t.wsl_shell_integration} onChange={(v) => save(["terminal", "wsl_shell_integration"], v)} />
       </Row>

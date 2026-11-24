@@ -55,6 +55,9 @@
     ${If} ${FileExists} "$INSTDIR\bin\hivetty.exe"
       nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" host stop'
       Pop $0
+      ; agent hooks point at this hivetty.exe; drop them so agents don't call a missing program
+      nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" hooks remove'
+      Pop $0
       nsExec::ExecToLog '"$INSTDIR\bin\hivetty.exe" setup-path --machine --remove "$INSTDIR\bin"'
       Pop $0
     ${EndIf}

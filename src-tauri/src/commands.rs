@@ -331,6 +331,12 @@ pub fn browser_focus(app: AppHandle, st: State<'_, AppState>, pane: PaneId) {
     st.browsers.focus(&app, pane);
 }
 
+/// The UI's active shortcut chords, so browser webviews can forward them instead of eating them.
+#[tauri::command]
+pub fn set_app_shortcuts(chords: Vec<String>) {
+    crate::browser::set_app_chords(chords);
+}
+
 // ---- config ----
 
 #[tauri::command(async)]

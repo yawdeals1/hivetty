@@ -170,6 +170,10 @@ pub struct TerminalConfig {
     /// Put a tmux-compatible `tmux` command on PATH (and set $TMUX) in local terminals, so tools
     /// that drive tmux (e.g. Claude Code agent teams) open native Hivetty splits instead.
     pub tmux_shim: bool,
+    /// On launch, install Hivetty's notification hooks into the coding agents found on this
+    /// machine (Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode),
+    /// so an agent that finishes or needs input marks its pane, tab and workspace.
+    pub agent_hooks: bool,
     /// Load Hivetty shell integration in WSL terminals whose login shell is bash
     /// (reports the working directory and prompt marks).
     pub wsl_shell_integration: bool,
@@ -179,7 +183,7 @@ pub struct TerminalConfig {
 
 impl Default for TerminalConfig {
     fn default() -> Self {
-        TerminalConfig { scrollback: 20000, copy_on_select: false, confirm_multiline_paste: true, bell: BellMode::Attention, tmux_shim: true, wsl_shell_integration: true, screen_reader: false }
+        TerminalConfig { scrollback: 20000, copy_on_select: false, confirm_multiline_paste: true, bell: BellMode::Attention, tmux_shim: true, agent_hooks: true, wsl_shell_integration: true, screen_reader: false }
     }
 }
 

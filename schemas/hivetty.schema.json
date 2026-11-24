@@ -47,6 +47,7 @@
         "confirm_multiline_paste": true,
         "bell": "attention",
         "tmux_shim": true,
+        "agent_hooks": true,
         "wsl_shell_integration": true,
         "screen_reader": false
       }
@@ -291,6 +292,11 @@
         },
         "tmux_shim": {
           "description": "Put a tmux-compatible `tmux` command on PATH (and set $TMUX) in local terminals, so tools\nthat drive tmux (e.g. Claude Code agent teams) open native Hivetty splits instead.",
+          "type": "boolean",
+          "default": true
+        },
+        "agent_hooks": {
+          "description": "On launch, install Hivetty's notification hooks into the coding agents found on this\nmachine (Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode),\nso an agent that finishes or needs input marks its pane, tab and workspace.",
           "type": "boolean",
           "default": true
         },

@@ -5,7 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api } from "./lib/api";
 import { activeWorkspace, focusedPane, panesOf, useStore } from "./state/store";
-import { actionFor, setBindings } from "./lib/keymap";
+import { actionFor, currentBindings, setBindings } from "./lib/keymap";
 import { commandActionId, refreshCommands, runAction } from "./lib/actions";
 import { applySettings, disposeMissing, flushScrollback, pickTheme, refitAll, settingsFromConfig } from "./lib/terminals";
 import { Sidebar } from "./components/Sidebar";
@@ -53,6 +53,8 @@ function applyConfig(cs: ConfigState) {
   const extra: Record<string, string> = {};
   for (const c of cs.config.commands) if (c.keybinding) extra[c.keybinding] = commandActionId({ ...c, source: null });
   setBindings(cs.config.keybindings, extra);
+  // Browser panes intercept these natively (a focused webview never lets keys reach this UI).
+  void api.setAppShortcuts(Object.keys(currentBindings()));
   const t = pickTheme(cs.config, cs.builtin_themes);
   if (t) document.documentElement.style.setProperty("--term-bg", t.background);
   void refreshCommands();
@@ -83,6 +85,11 @@ export default function App() {
       listen<Model>("state", (e) => setModel(e.payload)),
       listen<ConfigState>("config", (e) => applyConfig(e.payload)),
       listen<Info>("info", (e) => setInfo(e.payload)),
+      // A shortcut pressed while a browser pane's webview had focus (forwarded by the backend).
+      listen<string>("app-shortcut", (e) => {
+        const a = currentBindings()[e.payload];
+        if (a) runAction(a);
+      }),
       listen<UpdateStatus>("update-status", (e) => useStore.getState().set({ update: e.payload })),
       listen<{ pane: Id } & PaneStatus>("pane-status", (e) => showPaneStatus(e.payload.pane, { text: e.payload.text, kind: e.payload.kind })),
       // Files dropped on a terminal: paste their paths (ssh panes upload them first).

@@ -8,6 +8,7 @@ mod find;
 mod host;
 mod metadata;
 mod notify_os;
+mod agent_hooks;
 mod perf;
 mod profiles;
 mod project;
@@ -49,6 +50,7 @@ pub fn run() {
             metadata::start(handle.clone());
             config::watch(handle.clone());
             updater::start(handle.clone());
+            agent_hooks::ensure(&handle);
             // Restoring spawns shells (and maybe browser webviews), which takes a while. Do it off
             // the main thread: the UI's page is served from the main thread, so blocking it here
             // delays the first frame. get_state waits for this to finish.
@@ -143,6 +145,7 @@ pub fn run() {
             commands::browser_devtools,
             commands::browser_open,
             commands::browser_focus,
+            commands::set_app_shortcuts,
             commands::get_config,
             commands::config_set,
             commands::config_open,

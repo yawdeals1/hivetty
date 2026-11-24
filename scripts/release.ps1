@@ -61,6 +61,9 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
     $env:TAURI_SIGNING_PRIVATE_KEY = $default
 }
 if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) { $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '' }
+# A secret set through a Windows PowerShell pipe can start with a UTF-8 BOM, which the signer
+# rejects ("Invalid symbol 239, offset 0").
+$env:TAURI_SIGNING_PRIVATE_KEY = $env:TAURI_SIGNING_PRIVATE_KEY.Trim().TrimStart([char]0xFEFF)
 
 $sign = Join-Path $PSScriptRoot 'sign.ps1'
 
