@@ -11,12 +11,6 @@ every few hours:
 So **publishing a GitHub release is what rolls out an update.** `.github/workflows/release.yml`
 builds the installers for every published release and attaches them with `latest.json`.
 
-> **The repository is private.** GitHub only serves release files of a private repository to
-> signed-in users with access, so installed copies get "not found" when checking and can't
-> update, and the download links only work for you. Making the repository public, or publishing
-> releases from a separate public repository (change the two URLs in `src-tauri/src/updater.rs`
-> and `-DownloadBase`), makes updates work with no other changes.
-
 ## One-time setup
 
 - **Updater key (required).** Updates are verified against the public key in
