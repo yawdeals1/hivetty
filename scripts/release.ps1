@@ -33,7 +33,9 @@ param(
     # Update manifest URL baked into the build; {{channel}} is filled in at runtime.
     [Parameter(Mandatory = $true)][string]$UpdateEndpoint,
     [string]$Notes = '',
-    [switch]$SkipMsi
+    [switch]$SkipMsi,
+    # LOCAL TESTING ONLY: let the updater use plain http (e.g. a 127.0.0.1 test server).
+    [switch]$InsecureUpdates
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +93,10 @@ $release = [ordered]@{
         }
         windows                = @{ signCommand = $signCmd }
     }
+}
+if ($InsecureUpdates) {
+    Write-Warning 'InsecureUpdates: this build accepts updates over plain http. Never publish it.'
+    $release['plugins'] = @{ updater = @{ dangerousInsecureTransportProtocol = $true } }
 }
 $releaseConf = Join-Path $root 'target\tauri.release.conf.json'
 New-Item -ItemType Directory -Force (Split-Path $releaseConf) | Out-Null
