@@ -160,6 +160,8 @@ export interface Config {
   cursor: { style: "bar" | "block" | "underline"; blink: boolean };
   theme: string;
   themes: Theme[];
+  /** interface theme name, or "match" to follow the terminal theme */
+  ui_theme: string;
   terminal: { scrollback: number; copy_on_select: boolean; confirm_multiline_paste: boolean; bell: "attention" | "sound" | "none"; tmux_shim: boolean; agent_hooks: boolean; wsl_shell_integration: boolean; screen_reader: boolean };
   default_profile?: string;
   profiles: { id: string; name: string; command: string; args: string[]; shell?: string; cwd?: string; env?: Record<string, string> }[];

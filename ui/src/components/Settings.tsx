@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { buildActions } from "../lib/actions";
 import { chordOf, currentBindings, defaultBindings, normalizeChord, prettyChord, setSuspended } from "../lib/keymap";
 import { useStore } from "../state/store";
 import { closeOverlay } from "./Overlays";
 import { checkForUpdates, installUpdate } from "../lib/updates";
+import { fromTerminal, MATCH_TERMINAL, UI_THEMES, type UiTheme } from "../lib/uithemes";
+import { pickTheme } from "../lib/termutil";
 import type { CommandTarget, Config, CustomCommand, HostStatus, Theme } from "../types";
 
 type Section = "appearance" | "terminal" | "shells" | "session" | "keyboard" | "commands" | "updates";
@@ -87,6 +89,9 @@ export function Settings() {
   const cs = useStore((s) => s.config);
   const [section, setSection] = useState<Section>("appearance");
   const [error, setError] = useState<string | null>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  // Focus the dialog itself (not the first nav item) so Escape works without a focus ring.
+  useEffect(() => dialog.current?.focus({ preventScroll: true }), [cs !== null]);
   if (!cs) return null;
   const c = cs.config;
   const save = (path: string[], value: unknown) =>
@@ -100,6 +105,8 @@ export function Settings() {
       <div
         className="settings"
         role="dialog"
+        tabIndex={-1}
+        ref={dialog}
         aria-label="Settings"
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
@@ -109,7 +116,7 @@ export function Settings() {
         <nav className="set-nav">
           <div className="set-title">Settings</div>
           {SECTIONS.map(([id, name]) => (
-            <button key={id} className={section === id ? "on" : ""} onClick={() => setSection(id)} autoFocus={id === section}>
+            <button key={id} className={section === id ? "on" : ""} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>
               {name}
             </button>
           ))}
@@ -137,8 +144,10 @@ export function Settings() {
           {section === "commands" && <Commands c={c} save={save} />}
           {section === "updates" && <UpdatesSection c={c} save={save} />}
         </div>
-        <button className="set-close" title="Close (Esc)" onClick={closeOverlay}>
-          ×
+        <button className="set-close" title="Close (Esc)" aria-label="Close settings" onClick={closeOverlay}>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
         </button>
       </div>
     </div>
@@ -178,6 +187,59 @@ function Swatch({ t, active, onPick, onDelete }: { t: Theme; active: boolean; on
   );
 }
 
+/** A miniature of the app window drawn in the theme's own colors. */
+function UiThemeCard({ label, theme: t, active, onPick }: { label: string; theme: UiTheme; active: boolean; onPick: () => void }) {
+  const line = `color-mix(in srgb, ${t.text} 14%, ${t.surface})`;
+  const faint = `color-mix(in srgb, ${t.text} 40%, ${t.surface})`;
+  return (
+    <div
+      className={`ui-theme-card ${active ? "on" : ""}`}
+      role="radio"
+      aria-checked={active}
+      tabIndex={0}
+      onClick={onPick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPick();
+        }
+      }}
+    >
+      <div className="mini" style={{ background: t.bg, borderColor: line }} aria-hidden="true">
+        <div className="mini-side" style={{ background: t.surface, borderColor: line }}>
+          <i style={{ background: t.accent, width: "46%" }} />
+          <i className="mini-ws" style={{ background: `color-mix(in srgb, ${t.text} 12%, ${t.surface})` }}>
+            <b style={{ background: t.text }} />
+          </i>
+          <i className="mini-ws">
+            <b style={{ background: faint }} />
+            <em style={{ background: t.attention }} />
+          </i>
+          <i className="mini-ws">
+            <b style={{ background: faint }} />
+          </i>
+        </div>
+        <div className="mini-main">
+          <div className="mini-tabs" style={{ background: t.surface, borderColor: line }}>
+            <span style={{ background: t.bg, boxShadow: `inset 0 2px 0 ${t.accent}` }} />
+            <span />
+          </div>
+          <div className="mini-term">
+            <i style={{ background: t.text, width: "62%" }} />
+            <i style={{ background: faint, width: "40%" }} />
+            <i style={{ background: t.ok, width: "28%" }} />
+            <i style={{ background: t.accent, width: "8%" }} />
+          </div>
+        </div>
+      </div>
+      <div className="ui-theme-name">
+        <span>{label}</span>
+        <span className="dim">{t.note}</span>
+      </div>
+    </div>
+  );
+}
+
 function Appearance({ c, builtin, save }: { c: Config; builtin: Theme[]; save: Save }) {
   const [importing, setImporting] = useState<Theme[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -204,10 +266,23 @@ function Appearance({ c, builtin, save }: { c: Config; builtin: Theme[]; save: S
     void save(["themes"], next);
     setImporting(null);
   };
+  const terminal = pickTheme(c, builtin);
+  const uiChoices: { value: string; label: string; theme: UiTheme }[] = [
+    ...(terminal ? [{ value: MATCH_TERMINAL, label: "Match terminal", theme: fromTerminal(terminal) }] : []),
+    ...UI_THEMES.map((t) => ({ value: t.name, label: t.name, theme: t })),
+  ];
+  const uiCurrent = UI_THEMES.some((t) => t.name === c.ui_theme) ? c.ui_theme : MATCH_TERMINAL;
   return (
     <section>
-      <h2>Theme</h2>
-      <div className="theme-grid" role="radiogroup" aria-label="Theme">
+      <h2>Interface</h2>
+      <p className="set-hint set-lede">Colors for the sidebar, tabs, panels and dialogs. “Match terminal” takes them from the terminal theme below.</p>
+      <div className="ui-theme-grid" role="radiogroup" aria-label="Interface theme">
+        {uiChoices.map((o) => (
+          <UiThemeCard key={o.value} label={o.label} theme={o.theme} active={uiCurrent === o.value} onPick={() => save(["ui_theme"], o.value)} />
+        ))}
+      </div>
+      <h2>Terminal colors</h2>
+      <div className="theme-grid" role="radiogroup" aria-label="Terminal theme">
         {builtin.map((t) => (
           <Swatch key={t.name} t={t} active={c.theme === t.name} onPick={() => save(["theme"], t.name)} />
         ))}

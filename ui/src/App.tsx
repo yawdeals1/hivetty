@@ -14,6 +14,7 @@ import { SurfaceView } from "./components/PaneTree";
 import { NotificationPanel } from "./components/NotificationPanel";
 import { CommandPalette, FindBar, RenameDialog } from "./components/Overlays";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { applyUiTheme, pickUiTheme } from "./lib/uithemes";
 import type { ConfigState, Id, Info, Model, PaneStatus, UpdateStatus } from "./types";
 // Rarely opened: loaded on first use to keep startup lean.
 const Settings = lazy(() => import("./components/Settings").then((m) => ({ default: m.Settings })));
@@ -57,6 +58,9 @@ function applyConfig(cs: ConfigState) {
   void api.setAppShortcuts(Object.keys(currentBindings()));
   const t = pickTheme(cs.config, cs.builtin_themes);
   if (t) document.documentElement.style.setProperty("--term-bg", t.background);
+  const ui = pickUiTheme(cs.config.ui_theme, t);
+  applyUiTheme(ui);
+  getCurrentWindow().setTheme(ui.scheme).catch(() => {});
   void refreshCommands();
 }
 

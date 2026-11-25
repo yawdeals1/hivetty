@@ -4,6 +4,7 @@ import { paneLabel, panesOf, shortPath, useStore, workspaceUnread } from "../sta
 import type { Model, Workspace } from "../types";
 import { openPort, openUrl } from "../lib/open";
 import { AttentionMenu } from "./AttentionMenu";
+import { chordsFor, prettyChord } from "../lib/keymap";
 
 const COLORS = ["", "#f5b53d", "#5fa8ff", "#8fd18b", "#ef6b73", "#c98bf5", "#5fd1d1"];
 
@@ -60,8 +61,33 @@ export function Sidebar() {
       </div>
       <div className="sidebar-footer">
         <AttentionMenu />
+        <SettingsButton />
       </div>
     </aside>
+  );
+}
+
+function SettingsButton() {
+  const open = useStore((s) => s.overlay === "settings");
+  const chord = chordsFor("settings.open")[0];
+  return (
+    <button
+      className={`side-btn settings-btn ${open ? "open" : ""}`}
+      title={`Settings and themes${chord ? ` (${prettyChord(chord)})` : ""}`}
+      aria-label="Settings"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={() => useStore.getState().set({ overlay: open ? null : "settings" })}
+    >
+      <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          fill="currentColor"
+          fillRule="evenodd"
+          d="M6.7 1h2.6l.4 2 .9.4 1.7-1.1 1.8 1.8-1.1 1.7.4.9 2 .4v2.6l-2 .4-.4.9 1.1 1.7-1.8 1.8-1.7-1.1-.9.4-.4 2H6.7l-.4-2-.9-.4-1.7 1.1-1.8-1.8 1.1-1.7-.4-.9-2-.4V6.7l2-.4.4-.9-1.1-1.7 1.8-1.8 1.7 1.1.9-.4.4-2ZM8 10.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8Z"
+        />
+      </svg>
+      <span>Settings</span>
+    </button>
   );
 }
 

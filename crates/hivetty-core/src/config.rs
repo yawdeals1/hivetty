@@ -27,6 +27,10 @@ pub struct Config {
     pub theme: String,
     /// Extra color themes (import Windows Terminal schemes from Settings → Appearance).
     pub themes: Vec<Theme>,
+    /// Interface theme for the sidebar, tabs, panels and dialogs: "match" follows the terminal
+    /// theme's colors, or a built-in name ("Honeycomb", "Propolis", "Night Shift", "Lichen",
+    /// "Aubergine", "Contrast", "Beeswax", "Porcelain").
+    pub ui_theme: String,
     pub terminal: TerminalConfig,
     /// Profile id for new terminals (e.g. "pwsh", "cmd", "gitbash", "wsl:Ubuntu", or a custom id).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,6 +58,7 @@ impl Default for Config {
             cursor: CursorConfig::default(),
             theme: "Hivetty Dark".into(),
             themes: Vec::new(),
+            ui_theme: "match".into(),
             terminal: TerminalConfig::default(),
             default_profile: None,
             profiles: Vec::new(),

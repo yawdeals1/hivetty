@@ -39,6 +39,11 @@
       },
       "default": []
     },
+    "ui_theme": {
+      "description": "Interface theme for the sidebar, tabs, panels and dialogs: \"match\" follows the terminal\ntheme's colors, or a built-in name (\"Honeycomb\", \"Propolis\", \"Night Shift\", \"Lichen\",\n\"Aubergine\", \"Contrast\", \"Beeswax\", \"Porcelain\").",
+      "type": "string",
+      "default": "match"
+    },
     "terminal": {
       "$ref": "#/$defs/TerminalConfig",
       "default": {
