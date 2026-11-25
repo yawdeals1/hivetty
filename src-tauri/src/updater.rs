@@ -231,13 +231,25 @@ fn run_nsis_update(app: &AppHandle, version: &str, bytes: &[u8]) -> Result<(), S
 pub fn start(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(FIRST_CHECK).await;
+        // A failed check (offline at startup, flaky network) is retried soon instead of hiding a
+        // new release for a full RECHECK period.
+        const RETRY: [u64; 4] = [2 * 60, 5 * 60, 15 * 60, 30 * 60];
+        let mut failures = 0usize;
         loop {
             let enabled = app.state::<AppState>().config.lock().config.updates.check;
             let busy = matches!(status(&app).state, "downloading" | "installing" | "available");
             if enabled && !busy && endpoint(&app).is_some() {
-                let _ = check(&app).await;
+                if check(&app).await.is_ok() {
+                    failures = 0;
+                } else {
+                    failures += 1;
+                }
             }
-            tokio::time::sleep(RECHECK).await;
+            let wait = match failures {
+                0 => RECHECK,
+                n => Duration::from_secs(RETRY[(n - 1).min(RETRY.len() - 1)]),
+            };
+            tokio::time::sleep(wait).await;
         }
     });
 }
