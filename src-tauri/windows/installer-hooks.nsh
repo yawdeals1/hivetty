@@ -10,14 +10,29 @@
 ; process. Wait (up to 20 s) until it's really gone, then until nothing else (antivirus scanners,
 ; seen: McAfee, ~30 s) still holds the old exe: otherwise the installer's "is it running?" check
 ; (Restart Manager) aborts with "insufficient permissions to close Hivetty".
+;
+; Some scanners (seen: McAfee Framework Host, for minutes) keep the old exe open long after
+; Hivetty has exited. Tauri's check then tries to shut the scanner down, can't, and aborts with
+; "Failed to kill Hivetty". So once Hivetty itself is known to be gone and the file is still held,
+; rename it aside (Windows allows renaming a file that's open). The new exe is installed under
+; the normal name; the old copy is deleted now if possible, otherwise on the next update or reboot.
 !macro NSIS_HOOK_PREINSTALL
+  ; leftovers from an earlier update
+  Delete "$INSTDIR\${MAINBINARYNAME}.exe.old-*"
+  ; $8 = "1" once the Hivetty that started this update has exited
+  StrCpy $8 "0"
   ClearErrors
   ${GetOptions} $CMDLINE "/WAITPID=" $R9
   ${IfNot} ${Errors}
     ; SYNCHRONIZE = 0x00100000
     System::Call 'kernel32::OpenProcess(i 0x00100000, i 0, i R9) p .R8'
-    ${If} $R8 != 0
+    ${If} $R8 = 0
+      StrCpy $8 "1" ; already gone
+    ${Else}
       System::Call 'kernel32::WaitForSingleObject(p R8, i 20000) i .R7'
+      ${If} $R7 = 0 ; WAIT_OBJECT_0
+        StrCpy $8 "1"
+      ${EndIf}
       System::Call 'kernel32::CloseHandle(p R8)'
     ${EndIf}
   ${EndIf}
@@ -34,7 +49,7 @@
         System::Call 'RSTRTMGR::RmEndSession(i R1)'
         ; 234 = ERROR_MORE_DATA: something still has the file open
         ${If} $R0 = 234
-        ${AndIf} $R6 < 120
+        ${AndIf} $R6 < 60
           Sleep 500
           IntOp $R6 $R6 + 1
           Goto hivetty_rm_loop
@@ -42,6 +57,17 @@
       ${EndIf}
     System::Free $R3
     System::Free $R4
+    ; still held after ~30 s, and not by Hivetty: move it out of the way
+    ${If} $R0 = 234
+    ${AndIf} $8 == "1"
+      System::Call 'kernel32::GetTickCount() i .R5'
+      ClearErrors
+      Rename "$INSTDIR\${MAINBINARYNAME}.exe" "$INSTDIR\${MAINBINARYNAME}.exe.old-$R5"
+      ${IfNot} ${Errors}
+        DetailPrint "Another program (an antivirus scan?) still had Hivetty open; replacing it anyway."
+        Delete /REBOOTOK "$INSTDIR\${MAINBINARYNAME}.exe.old-$R5"
+      ${EndIf}
+    ${EndIf}
   ${EndIf}
 !macroend
 

@@ -61,7 +61,9 @@ tag to rebuild it).
 - In-app updates start the NSIS installer elevated with `/P /UPDATE /R /WAITPID=<pid>`; if the
   UAC prompt is declined, Hivetty keeps running. The installer waits for the old process to end,
   then until nothing (e.g. an antivirus scan) holds the old exe, so it never aborts with
-  "insufficient permissions to close Hivetty".
+  "insufficient permissions to close Hivetty". If something else (seen: McAfee) still holds the
+  old `hivetty-app.exe` after ~30 s, the installer renames it aside and installs the new one
+  instead of failing with "Failed to kill Hivetty"; the old copy is deleted later.
 
 ## Testing an update locally
 
